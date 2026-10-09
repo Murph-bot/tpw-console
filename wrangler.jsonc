@@ -24,6 +24,11 @@
 			"name": "my-workflow",
 			"binding": "MY_WORKFLOW",
 			"class_name": "MyWorkflow"
+		},
+		{
+			"name": "shipment-exception-workflow",
+			"binding": "SHIPMENT_EXCEPTION_WORKFLOW",
+			"class_name": "ShipmentExceptionWorkflow"
 		}
 	],
 	/**
