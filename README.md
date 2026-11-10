@@ -1,39 +1,57 @@
-# Cloudflare Workflows Starter Template
+# tpw-console
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/workflows-starter-template)
+A shipment-exception console built on [Cloudflare Workflows](https://developers.cloudflare.com/workflows).
+When a shipment hits a problem, a durable workflow opens a case, waits for the owner to resolve
+it within the SLA, and escalates up a ladder of owners when the SLA runs out.
 
-<!-- dash-content-start -->
+It started from Cloudflare's Workflows starter template. The template's demo workflow
+(`MyWorkflow`, the animated diagram in the UI) is still in the repo next to the shipment
+workflow.
 
-A real-time, interactive demonstration of [Cloudflare Workflows](https://developers.cloudflare.com/workflows) with live updates via WebSockets and Durable Objects. This template showcases durable multi-step workflows with time-based delays, event-driven pauses, and real-time status visualization.
+## How the shipment workflow works
 
-<!-- dash-content-end -->
+1. **Open case** — `POST /api/shipment-exceptions` starts one workflow instance per case.
+2. **Wait for resolution** — the workflow pauses on `step.waitForEvent` for the SLA window
+   of the current owner.
+3. **Escalate** — if nobody resolves the case in time, it moves to the next owner. This
+   repeats up to 3 escalations.
+4. **Close or hand off** — a resolution closes the case; running out of escalations hands
+   it off as unresolved.
 
-![Cloudflare Workflows Starter Template](assets/template-screenshot.png)
+The rules live in `worker/shipment-exception.ts` as plain data, separate from the workflow,
+so they can change without touching durable state:
 
-## Getting Started
+| Exception code | Severity | SLA per owner | Escalation ladder |
+|---|---|---|---|
+| `customs_hold` | high | 24 h | customs broker → trade compliance lead → logistics director |
+| `delivery_attempt_failed` | medium | 8 h | regional dispatcher → operations manager → operations director |
+| `damaged_in_transit` | critical | 4 h | claims team → operations manager → COO |
+| `dwell_time` | low | 48 h | yard supervisor → operations manager → operations director |
 
-### Installation
+## API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/shipment-exceptions` | Open a case. Body: `shipmentId`, `exceptionCode`, optional `note` |
+| `GET` | `/api/shipment-exceptions/:caseId` | Case status |
+| `POST` | `/api/shipment-exceptions/:caseId/resolve` | Resolve a case. Body includes `resolvedBy` |
+| `POST` | `/api/workflow/start` | Start the template demo workflow |
+| `GET` | `/ws` | WebSocket for live demo-workflow status |
+
+## Layout
+
+- `worker/` — Worker entry (`index.ts`), the two workflows, the policy table, and the
+  Durable Object that pushes status over WebSockets
+- `src/` — React front end (Vite, Tailwind)
+- `test/` — Vitest tests that run inside the Workers runtime
+
+## Commands
 
 ```bash
 npm install
+npm run dev      # local dev server on http://localhost:5173
+npm test         # Vitest
+npm run lint     # ESLint
+npm run build    # typecheck + production build
+npm run deploy   # build, then wrangler deploy
 ```
-
-### Development
-
-```bash
-npm run dev
-```
-
-Visit `http://localhost:5173` to see the interactive demo.
-
-### Deployment
-
-```bash
-npm run deploy
-```
-
-## Learn More
-
-- [Cloudflare Workflows Documentation](https://developers.cloudflare.com/workflows)
-- [Durable Objects Documentation](https://developers.cloudflare.com/durable-objects)
-- [Workers Documentation](https://developers.cloudflare.com/workers)
